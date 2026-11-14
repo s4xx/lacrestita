@@ -1,0 +1,431 @@
+// La Crestita - Esquema de Base de Datos
+// 25+ tablas PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// === CONFIGURACIÓN ===
+
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("ENCARGADO_TIENDA") // ADMIN, GERENTE, ENCARGADO_TIENDA, DISTRIBUIDOR
+  active    Boolean  @default(true)
+  distribuidorId String?
+  distribuidorNombre String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+model Sucursal {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique // Central, Norte, Sur
+  createdAt DateTime @default(now())
+
+  inventario Inventario[]
+  trabajadores Trabajador[]
+  ventasTienda VentaTienda[]
+  @@map("sucursales")
+}
+
+model Categoria {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  icon      String   @default("📦")
+  color     String   @default("#3B82F6")
+  createdAt DateTime @default(now())
+
+  productos Producto[]
+  @@map("categorias")
+}
+
+model Producto {
+  id             Int      @id @default(autoincrement())
+  nombre         String
+  precioMaple    Float
+  precioUnidad   Float?
+  icon           String   @default("🥚")
+  categoriaId    Int
+  stockBajo      Int      @default(60)
+  diasVencimiento Int     @default(21)
+  unidadesPorMaple Int    @default(30)
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  categoria      Categoria @relation(fields: [categoriaId], references: [id])
+  inventario     Inventario[]
+  ventaItems     VentaTiendaItem[]
+  mermas         Merma[]
+  @@map("productos")
+}
+
+// === INVENTARIO ===
+
+model Inventario {
+  id              Int      @id @default(autoincrement())
+  productoId      Int
+  sucursalId      Int
+  banco           String?  // proveedor
+  fechaLlegada    DateTime
+  cantidad        Int      // total que llegó
+  precioCompra    Float    // precio por unidad
+  cantidadVendida Int      @default(0)
+  esTraspaso      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  producto        Producto  @relation(fields: [productoId], references: [id])
+  sucursal        Sucursal  @relation(fields: [sucursalId], references: [id])
+  @@map("inventario")
+}
+
+model Movimiento {
+  id          Int      @id @default(autoincrement())
+  fecha       DateTime @default(now())
+  tipo        String   // ENTRADA, SALIDA_VENTA, SALIDA_DISTRIBUCION, SALIDA_MERMA, TRASPASO, AJUSTE_NEGATIVO, AJUSTE_POSITIVO, RECONTEO, DEVOLUCION_ANULACION, DEVOLUCION_CLIENTE
+  descripcion String
+  cantidad    Int
+  productoId  Int?
+  sucursal    String?
+  referencia  String?
+  usuario     String?
+  @@map("movimientos")
+}
+
+model Traspaso {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  origen          String
+  destino         String
+  productoId      Int
+  productoNombre  String
+  cantidad        Int
+  motivo          String
+  usuario         String?
+  @@map("traspasos")
+}
+
+// === VENTAS TIENDA ===
+
+model VentaTienda {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  cliente         String
+  tel             String?
+  clienteId       Int?
+  productos       String   // descripción texto
+  total           Float
+  metodo          String   // EFECTIVO, QR, TARJETA, CREDITO, MIXTO
+  desgloseMixto   Json?
+  anulada         Boolean  @default(false)
+  motivoAnulacion String?
+  sucursal        String   @default("Central")
+  vendedor        String?
+  lotesAfectados  Json?
+  @@map("ventas_tienda")
+}
+
+model VentaTiendaItem {
+  id           Int      @id @default(autoincrement())
+  ventaId      Int
+  productoId   Int
+  nombre       String
+  icon         String?
+  maples       Int      @default(0)
+  medias       Int      @default(0)
+  docenas      Int      @default(0)
+  unidades     Int      @default(0)
+  totalUnidades Int
+  subtotal     Float
+  precioUnidad Float?
+  precioMaple  Float?
+
+  venta        VentaTienda @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  producto     Producto    @relation(fields: [productoId], references: [id])
+  @@map("venta_tienda_items")
+}
+
+// === DISTRIBUCIÓN ===
+
+model AsignacionDistribuidor {
+  id                Int      @id @default(autoincrement())
+  distribuidorId    String
+  distribuidorNombre String
+  tipo              String   @default("PROPIO")
+  sucursal          String
+  fecha             DateTime @default(now())
+  hora              String
+  productos         Json     // array de productos asignados
+  totalMaples       Float
+  totalUnidades     Int
+  dineroCambio      Float
+  entregadoPor      String?
+  observaciones     String?
+  entregas          EntregaDistribuidor[]
+  ventasEfectivo    Float    @default(0)
+  ventasQR          Float    @default(0)
+  ventasCredito     Float    @default(0)
+  totalDevoluciones Float    @default(0)
+  totalMermas       Float    @default(0)
+  dineroFinal       Float
+  cuadra            Boolean  @default(true)
+  stockRecibido     Boolean  @default(false)
+  liquidada         Boolean  @default(false)
+  fechaLiquidacion  String?
+  motivoLiquidacion String?
+  @@map("asignaciones_distribuidores")
+}
+
+model EntregaDistribuidor {
+  id              Int      @id @default(autoincrement())
+  asignacionId    Int
+  fecha           DateTime @default(now())
+  hora            String
+  cliente         String
+  tel             String?
+  dir             String?
+  productos       String
+  productosArr    Json?
+  totalUnidades   Int?
+  total           Float
+  metodo          String   // EFECTIVO, QR, CREDITO, MIXTO
+  desgloseMixto   Json?
+  registradoPor   String?
+  clienteId       Int?
+  @@map("entregas_distribuidor")
+}
+
+// === MERMAS ===
+
+model Merma {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  tipo            String   // ROTO, RAJADO, REGALADO, PODRIDO, VENCIDO
+  cantidad        Int
+  productoId      Int
+  productoNombre  String
+  sucursal        String
+  cliente         String?
+  descripcion     String
+  fotoBase64      String?
+  registradoPor   String?
+  origen          String   @default("TIENDA") // TIENDA o DISTRIBUIDOR
+  distribuidorId  String?
+  asigId          String?
+  @@map("mermas")
+}
+
+// === RRHH ===
+
+model Trabajador {
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  rol             String   // DISTRIBUIDOR, ENCARGADO_TIENDA, GERENTE
+  sucursalId      Int
+  telefono        String
+  direccion       String?
+  fechaIngreso    DateTime
+  salario         Float
+  estado          String   @default("ACTIVO") // ACTIVO, VACACIONES, LICENCIA, INACTIVO
+  documentos      Json     // {doc_carnet: {entregado: true}, ...}
+  metodoContratacion String?
+  observaciones   String?
+  adelantos       Json?
+  createdAt       DateTime @default(now())
+
+  sucursal        Sucursal @relation(fields: [sucursalId], references: [id])
+  @@map("trabajadores")
+}
+
+model SalarioPago {
+  id           Int      @id @default(autoincrement())
+  trabId       String
+  trabajador   String
+  fecha        DateTime @default(now())
+  hora         String
+  monto        Float
+  concepto     String?
+  usuario      String?
+  @@map("salarios_pagos")
+}
+
+// === CLIENTES ===
+
+model Cliente {
+  id              Int      @id @default(autoincrement())
+  nombre          String
+  telefono        String?
+  direccion       String?
+  zona            String?
+  pedidoSiempre   Json?
+  metodoHabitual  String?
+  totalComprado   Float    @default(0)
+  numPedidos      Int      @default(0)
+  fechaRegistro   DateTime @default(now())
+  @@map("clientes")
+}
+
+model Pedido {
+  id              Int      @id @default(autoincrement())
+  numero          Int
+  cliente         String
+  tel             String?
+  dir             String?
+  productos       String?
+  total           Float
+  metodo          String?
+  estado          String   @default("PENDIENTE") // PENDIENTE, EN_RUTA, ENTREGADO, REPROGRAMADO, ANULADO
+  fechaCreacion   String
+  fechaEntrega    String?
+  distribuidorId  String?
+  clienteId       Int?
+  observacion     String?
+  reprogramaciones Json?
+  @@map("pedidos")
+}
+
+// === CRÉDITOS ===
+
+model Credito {
+  id              Int      @id @default(autoincrement())
+  cliente         String
+  tel             String?
+  montoOriginal   Float
+  saldo           Float
+  fecha           DateTime @default(now())
+  hora            String
+  ventaId         String?
+  entregaId       String?
+  clienteId       Int?
+  abonos          Json?
+  estado          String   @default("PENDIENTE") // PENDIENTE, PAGADO, VENCIDO, MOROSO, ANULADO
+  plazoDias       Int      @default(15)
+  interesMensual  Float    @default(0)
+  fechaVencimiento String?
+  origen          String   @default("TIENDA")
+  distribuidorId  String?
+  interesPagado   Float    @default(0)
+  @@map("creditos")
+}
+
+// === CAJA ===
+
+model CajaMovimiento {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  tipo            String   // APERTURA, INGRESO, GASTO, CIERRE, CIERRE_DIA
+  concepto        String
+  monto           Float
+  montoEsperado   Float?
+  diferencia      Float?
+  tipoDiferencia  String?
+  motivoDiferencia String?
+  observaciones   String?
+  usuario         String?
+  @@map("caja_movimientos")
+}
+
+model CierreDia {
+  id              Int      @id @default(autoincrement())
+  fecha           String   @unique
+  horaCierre      String
+  cerradoPor      String?
+  motivo          String?
+  dineroFisico    Float
+  totalTienda     Float
+  totalDistribuidores Float
+  total           Float
+  ventasTiendaCount Int?
+  mermasCount     Int?
+  devolucionesCount Int?
+  distribuidoresLiquidados Int?
+  @@map("cierres_dia")
+}
+
+// === FACTURAS ===
+
+model Factura {
+  id              Int      @id @default(autoincrement())
+  numero          String   @unique
+  fecha           DateTime @default(now())
+  hora            String
+  cliente         String
+  nit             String?
+  concepto        String
+  total           Float
+  referencia      String?
+  ventaId         String?
+  pedidoId        String?
+  usuario         String?
+  @@map("facturas")
+}
+
+// === DEVOLUCIONES ===
+
+model Devolucion {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  cliente         String
+  productoId      Int?
+  productoNombre  String
+  cantidad        Int
+  monto           Float
+  motivo          String
+  usuario         String?
+  origen          String   @default("TIENDA")
+  distribuidorId  String?
+  @@map("devoluciones")
+}
+
+// === AUDITORÍA ===
+
+model AuditoriaLog {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  hora            String
+  usuario         String?
+  accion          String
+  entidad         String
+  detalle         String
+  @@map("auditoria_log")
+}
+
+// === REFERIDOS ===
+
+model Referido {
+  id              Int      @id @default(autoincrement())
+  fecha           DateTime @default(now())
+  clienteNuevo    String
+  referidoPor     String?
+  descuento       Float    @default(0)
+  estado          String   @default("PENDIENTE")
+  @@map("referidos")
+}
+
+// === BLOG ===
+
+model BlogEntrada {
+  id              Int      @id @default(autoincrement())
+  titulo          String
+  resumen         String?
+  contenido       String
+  fecha           DateTime @default(now())
+  autor           String?
+  @@map("blog_entradas")
+}
+
