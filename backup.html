@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>💾 La Crestita - Backup y Recuperación</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body{font-family:system-ui,sans-serif;background:#0f172a}</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+<!-- LOGIN -->
+<div id="loginPanel" class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+  <div class="text-center mb-6">
+    <div class="text-5xl mb-2">💾</div>
+    <h1 class="text-2xl font-extrabold text-gray-800">Backup y Recuperación</h1>
+    <p class="text-sm text-gray-500 mt-1">La Crestita · Panel exclusivo del dueño</p>
+  </div>
+  <form id="loginForm" class="space-y-3">
+    <div><label class="text-xs font-semibold">Email</label><input id="email" type="email" required class="w-full h-11 px-3 border rounded text-sm"></div>
+    <div><label class="text-xs font-semibold">Contraseña</label><input id="pass" type="password" required class="w-full h-11 px-3 border rounded text-sm"></div>
+    <button type="submit" class="w-full py-3 bg-slate-800 hover:bg-slate-900 text-white rounded font-bold">🔐 Acceder</button>
+  </form>
+  <p class="text-xs text-gray-400 text-center mt-4">⚠️ Panel separado del sistema principal · Solo acceso del dueño</p>
+</div>
+
+<!-- PANEL BACKUP -->
+<div id="backupPanel" class="hidden bg-white rounded-2xl shadow-2xl p-8 max-w-4xl w-full">
+  <div class="flex justify-between items-center mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold text-gray-800">💾 Backup y Recuperación</h1>
+      <p class="text-sm text-gray-500">La Crestita · Base de datos PostgreSQL</p>
+    </div>
+    <button onclick="logout()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm font-semibold">🚪 Salir</button>
+  </div>
+  
+  <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-xs text-blue-800">
+    <p class="font-bold mb-1">📋 Información del sistema de backups</p>
+    <p>• <b>Automático:</b> todos los días a las 2:00 AM se hace un backup completo</p>
+    <p>• <b>Conservación:</b> se guardan los últimos 30 días</p>
+    <p>• <b>Restaurar:</b> seleccioná un backup y clic "Restaurar" - se crea backup de seguridad antes</p>
+    <p>• <b>Ubicación:</b> /var/backups/pg/ en el VPS</p>
+  </div>
+
+  <div class="flex justify-between items-center mb-4">
+    <p class="font-bold text-sm"><span id="backupsCount">0</span> backups disponibles</p>
+    <button onclick="crearBackup()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold">📦 Crear backup ahora</button>
+  </div>
+
+  <div id="backupsList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+</div>
+
+<script>
+var API = window.location.origin + '/api';
+var token = null;
+
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  var email = document.getElementById('email').value;
+  var pass = document.getElementById('pass').value;
+  try {
+    var r = await fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email:email, password:pass})
+    });
+    var data = await r.json();
+    if (r.ok && data.token) {
+      // Verificar que sea ADMIN
+      if (data.user.role !== 'ADMIN') {
+        alert('⛔ Solo el dueño (ADMIN) puede acceder a este panel');
+        return;
+      }
+      token = data.token;
+      document.getElementById('loginPanel').classList.add('hidden');
+      document.getElementById('backupPanel').classList.remove('hidden');
+      cargarBackups();
+    } else {
+      alert('❌ Credenciales incorrectas');
+    }
+  } catch(err) {
+    alert('❌ Error de conexión: ' + err.message);
+  }
+});
+
+async function cargarBackups() {
+  try {
+    var r = await fetch(API + '/backups', {headers: {'Authorization':'Bearer '+token}});
+    var data = await r.json();
+    document.getElementById('backupsCount').textContent = data.length;
+    var list = document.getElementById('backupsList');
+    if (!data.length) {
+      list.innerHTML = '<p class="text-center text-gray-500 py-8">No hay backups disponibles</p>';
+      return;
+    }
+    list.innerHTML = data.map(function(b) {
+      return '<div class="flex items-center justify-between border rounded-lg p-3 bg-gray-50">' +
+        '<div>' +
+          '<p class="font-mono text-xs font-bold">' + b.filename + '</p>' +
+          '<p class="text-xs text-gray-500">' + (b.fecha||'—') + ' ' + (b.hora||'') + ' · ' + (b.tamanoLegible||'—') + '</p>' +
+        '</div>' +
+        '<button onclick="restaurarBackup(\'' + b.filename + '\')" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded text-xs font-bold">♻️ Restaurar</button>' +
+      '</div>';
+    }).join('');
+  } catch(err) {
+    alert('Error al cargar backups: ' + err.message);
+  }
+}
+
+async function crearBackup() {
+  if (!confirm('¿Crear un backup AHORA de la base de datos completa?')) return;
+  try {
+    var r = await fetch(API + '/backups/crear', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
+      body: '{}'
+    });
+    var data = await r.json();
+    if (data.ok) {
+      alert('✅ Backup creado: ' + data.filename);
+      cargarBackups();
+    } else {
+      alert('❌ Error: ' + (data.error||'desconocido'));
+    }
+  } catch(err) {
+    alert('❌ Error: ' + err.message);
+  }
+}
+
+async function restaurarBackup(filename) {
+  if (!confirm('⚠️ ¿RESTAURAR el backup "' + filename + '"?\n\nEsto va a REEMPLAZAR todos los datos actuales.\nSe crea un backup de seguridad antes.\n\n¿Continuar?')) return;
+  try {
+    var r = await fetch(API + '/backups/restaurar', {
+      method: 'POST',
+      headers: {'Authorization':'Bearer '+token, 'Content-Type':'application/json'},
+      body: JSON.stringify({filename:filename})
+    });
+    var data = await r.json();
+    if (data.ok) {
+      alert('✅ Backup restaurado correctamente\n\nBackup usado: ' + filename + '\nBackup de seguridad: ' + data.safetyBackup);
+    } else {
+      alert('❌ Error: ' + (data.error||'desconocido'));
+    }
+  } catch(err) {
+    alert('❌ Error: ' + err.message);
+  }
+}
+
+function logout() {
+  token = null;
+  document.getElementById('backupPanel').classList.add('hidden');
+  document.getElementById('loginPanel').classList.remove('hidden');
+  document.getElementById('email').value = '';
+  document.getElementById('pass').value = '';
+}
+</script>
+</body>
+</html>

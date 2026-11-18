@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🥚 La Crestita - Tienda Online</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #fef3c7; }
+  .producto-card { transition: all 0.2s; }
+  .producto-card:hover { transform: translateY(-4px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: white; padding: 16px 24px; border-radius: 8px;
+    z-index: 1000; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg sticky top-0 z-40">
+  <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🥚</span>
+      <div>
+        <h1 class="text-2xl font-extrabold">LA CRESTITA</h1>
+        <p class="text-xs opacity-90">Huevos frescos del campo, directo a tu casa</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="btnCarrito" onclick="abrirCarrito()" class="relative bg-white text-orange-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-orange-50 flex items-center gap-2">
+        🛒 Carrito
+        <span id="carritoCount" class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold" style="display:none">0</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+<!-- MODO DE ENTREGA (TOGGLE) -->
+<section class="bg-white rounded-xl shadow-md p-4 mb-6">
+  <p class="text-sm font-bold text-gray-700 mb-3 text-center">🚚 ¿Cómo querés recibir tu pedido?</p>
+  <div class="grid grid-cols-2 gap-3 max-w-md mx-auto">
+    <button id="btnRecoger" onclick="cambiarModo('RECOJO')" class="modo-btn p-4 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-700 font-bold transition">
+      <div class="text-3xl mb-1">🏪</div>
+      <div class="text-sm">Recoger en Agencia</div>
+      <div class="text-[10px] text-gray-600 mt-1">Central · sin recargo</div>
+    </button>
+    <button id="btnDomicilio" onclick="cambiarModo('DOMICILIO')" class="modo-btn p-4 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-bold transition">
+      <div class="text-3xl mb-1">🚚</div>
+      <div class="text-sm">Entrega a Domicilio</div>
+      <div class="text-[10px] text-gray-600 mt-1">+10% recargo</div>
+    </button>
+  </div>
+  <p id="modoInfo" class="text-center text-xs text-gray-500 mt-3">Modo actual: Recoger en Agencia · Precios normales</p>
+</section>
+
+<!-- HERO -->
+<section class="bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-xl p-8 mb-6 text-center">
+  <h2 class="text-3xl font-extrabold mb-2">🥚 Huevos frescos del campo</h2>
+  <p class="text-lg opacity-90">Directo de la granja a tu mesa · Bolivia</p>
+  <p class="text-sm opacity-75 mt-2">Pedí online y recibí en casa o pasá a buscarlo</p>
+</section>
+
+<!-- PRODUCTOS -->
+<section class="mb-6">
+  <h3 class="text-xl font-bold mb-4 text-gray-800">📦 Nuestros productos</h3>
+  <div id="productosGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div class="text-center text-gray-500 col-span-full py-8">
+      <p class="text-3xl mb-2">⏳</p>
+      <p>Cargando productos...</p>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACTO -->
+<section class="bg-white rounded-xl shadow-md p-6 mb-6">
+  <h3 class="text-xl font-bold mb-3 text-gray-800">📞 Contacto</h3>
+  <div class="grid md:grid-cols-3 gap-4 text-sm">
+    <div><p class="font-bold text-gray-700">📍 Dirección</p><p class="text-gray-600">Zona Central, La Paz, Bolivia</p></div>
+    <div><p class="font-bold text-gray-700">📞 Teléfono</p><p class="text-gray-600">+591 70000000</p></div>
+    <div><p class="font-bold text-gray-700">🕐 Horario</p><p class="text-gray-600">Lunes a Sábado 7:00 - 20:00</p></div>
+  </div>
+</section>
+
+<footer class="text-center text-xs text-gray-500 py-6">
+  <p>🥚 La Crestita © 2026 · Distribuidora de huevos frescos · Bolivia</p>
+</footer>
+
+</main>
+
+<!-- MODAL: Agregar al carrito -->
+<div id="modalAgregar" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+    <div class="flex justify-between items-start mb-4">
+      <div>
+        <h3 id="modalProdNombre" class="text-lg font-bold"></h3>
+        <p id="modalProdPrecio" class="text-sm text-gray-600"></p>
+      </div>
+      <button onclick="cerrarModalAgregar()" class="text-gray-400 hover:text-gray-700 text-2xl">×</button>
+    </div>
+    <div id="modalMultiUnidad"></div>
+    <button onclick="confirmarAgregar()" class="w-full mt-4 py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold">🛒 Agregar al carrito</button>
+  </div>
+</div>
+
+<!-- MODAL: Carrito + Checkout -->
+<div id="modalCarrito" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-xl font-bold">🛒 Tu carrito</h3>
+      <button onclick="cerrarCarrito()" class="text-gray-400 hover:text-gray-700 text-2xl">×</button>
+    </div>
+    <div id="carritoItems"></div>
+    <div id="carritoVacio" class="text-center py-8 text-gray-500">
+      <p class="text-4xl mb-2">🛒</p>
+      <p>Tu carrito está vacío</p>
+    </div>
+    <div id="carritoResumen" class="hidden mt-4 border-t pt-4">
+      <div class="flex justify-between text-sm mb-1"><span>Subtotal:</span><span id="resSubtotal" class="font-bold"></span></div>
+      <div id="recargoRow" class="flex justify-between text-sm mb-1 text-orange-700"><span>🚚 Recargo delivery:</span><span id="resRecargo" class="font-bold"></span></div>
+      <div class="flex justify-between text-lg font-extrabold border-t pt-2 mt-2"><span>Total:</span><span id="resTotal" class="text-orange-600"></span></div>
+    </div>
+    <div id="checkoutForm" class="hidden mt-4 space-y-3">
+      <h4 class="font-bold text-gray-800">📋 Datos de contacto</h4>
+      <div><label class="text-xs font-semibold">Nombre *</label><input id="ck-nombre" type="text" required class="w-full h-10 px-2 border rounded text-sm"></div>
+      <div><label class="text-xs font-semibold">Teléfono *</label><input id="ck-tel" type="tel" required class="w-full h-10 px-2 border rounded text-sm"></div>
+      <div id="ck-dir-wrap"><label class="text-xs font-semibold">📍 Dirección *</label><input id="ck-dir" type="text" required class="w-full h-10 px-2 border rounded text-sm" placeholder="Zona, calle, número"></div>
+      <div id="ck-suc-wrap" class="hidden"><label class="text-xs font-semibold">🏪 Sucursal para recoger *</label><select id="ck-suc" class="w-full h-10 px-2 border rounded text-sm bg-white"><option>Central</option><option>Norte</option><option>Sur</option></select></div>
+      <div><label class="text-xs font-semibold">🕐 Hora preferida *</label><select id="ck-hora" class="w-full h-10 px-2 border rounded text-sm bg-white"><option>Hoy 9-12</option><option>Hoy 12-15</option><option>Hoy 15-18</option><option>Hoy 18-20</option><option>Mañana 9-12</option><option>Mañana 15-18</option></select></div>
+      <div><label class="text-xs font-semibold">📝 Observación (opcional)</label><textarea id="ck-obs" rows="2" class="w-full p-2 border rounded text-sm" placeholder="Ej: tocar 2 veces el timbre"></textarea></div>
+      <button onclick="confirmarPedido()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-base">✓ Confirmar pedido</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast">
+  <p id="toastTitle" class="font-bold"></p>
+  <p id="toastMsg" class="text-xs opacity-90"></p>
+</div>
+
+<!-- MODAL ÉXITO (ventana flotante sin mostrar IP) -->
+<div id="modalExito" class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center p-4 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl text-center" style="animation: zoomIn 0.3s ease-out">
+    <div class="mx-auto w-20 h-20 bg-gradient-to-br from-emerald-400 to-green-500 rounded-full flex items-center justify-center text-5xl mb-4 shadow-lg">
+      ✓
+    </div>
+    <h2 class="text-2xl font-extrabold text-gray-800 mb-2">¡Pedido confirmado!</h2>
+    <p class="text-sm text-gray-600 mb-4">Tu pedido fue recibido correctamente</p>
+    <div class="bg-gradient-to-r from-orange-100 to-amber-100 border-2 border-orange-300 rounded-xl p-3 mb-4">
+      <p class="text-xs text-gray-600 uppercase tracking-wide">Número de pedido</p>
+      <p id="exitoNumPedido" class="text-3xl font-extrabold text-orange-600">W-0001</p>
+    </div>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm">
+      <p class="text-gray-700">📞 Nosotros te contactaremos al</p>
+      <p id="exitoTel" class="font-bold text-blue-700 text-lg">70000000</p>
+      <p class="text-xs text-gray-500 mt-1">para coordinar la entrega</p>
+    </div>
+    <p class="text-xs text-gray-400 mb-4">🥚 La Crestita · Huevos frescos del campo</p>
+    <button onclick="cerrarModalExito()" class="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-lg font-bold text-base shadow-md transition">
+      ✓ Aceptar
+    </button>
+  </div>
+</div>
+
+<style>
+@keyframes zoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+</style>
+
+<script>
+var API = window.location.origin + '/api';
+var productos = [];
+var carrito = [];
+var modoActual = 'RECOJO';  // RECOJO o DOMICILIO
+var productoSeleccionado = null;
+
+// Cargar productos al iniciar
+async function cargarProductos() {
+  try {
+    var r = await fetch(API + '/tienda/productos');
+    productos = await r.json();
+    renderProductos();
+  } catch(e) {
+    document.getElementById('productosGrid').innerHTML = '<div class="text-center text-red-500 col-span-full py-8"><p>Error al cargar productos</p></div>';
+  }
+}
+
+function precioActual(p) {
+  return modoActual === 'DOMICILIO' ? p.precioDomicilio : p.precioRecoger;
+}
+
+function precioUnidadActual(p) {
+  var precioMaple = precioActual(p);
+  return precioMaple / (p.unidadesPorMaple || 30);
+}
+
+function renderProductos() {
+  var grid = document.getElementById('productosGrid');
+  if (!productos.length) {
+    grid.innerHTML = '<div class="text-center text-gray-500 col-span-full py-8"><p>No hay productos disponibles</p></div>';
+    return;
+  }
+  grid.innerHTML = productos.map(function(p) {
+    var precio = precioActual(p);
+    var precioU = precioUnidadActual(p);
+    return '<div class="producto-card bg-white rounded-xl shadow-md overflow-hidden border-2 border-orange-200">' +
+      '<div class="bg-gradient-to-br from-orange-50 to-amber-50 p-4 text-center">' +
+        '<div class="text-5xl mb-2">' + (p.icon || '🥚') + '</div>' +
+        '<h4 class="font-bold text-gray-800">' + p.nombre + '</h4>' +
+      '</div>' +
+      '<div class="p-3 text-center">' +
+        '<div class="grid grid-cols-2 gap-2 mb-3">' +
+          '<div class="bg-orange-50 rounded p-2"><p class="text-[10px] text-gray-500">Maple (30u)</p><p class="font-bold text-orange-600 text-lg">Bs.' + precio + '</p></div>' +
+          '<div class="bg-blue-50 rounded p-2"><p class="text-[10px] text-gray-500">Unidad</p><p class="font-bold text-blue-600 text-lg">Bs.' + precioU.toFixed(2) + '</p></div>' +
+        '</div>' +
+        '<button onclick="abrirModalAgregar(' + p.id + ')" class="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-bold text-sm">🛒 Agregar</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function cambiarModo(modo) {
+  modoActual = modo;
+  // Actualizar UI de botones
+  var btnR = document.getElementById('btnRecoger');
+  var btnD = document.getElementById('btnDomicilio');
+  if (modo === 'RECOJO') {
+    btnR.className = 'modo-btn p-4 rounded-xl border-2 border-blue-500 bg-blue-50 text-blue-700 font-bold transition';
+    btnD.className = 'modo-btn p-4 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-bold transition';
+    document.getElementById('modoInfo').textContent = 'Modo actual: Recoger en Agencia · Precios normales';
+    document.getElementById('ck-dir-wrap').classList.add('hidden');
+    document.getElementById('ck-suc-wrap').classList.remove('hidden');
+  } else {
+    btnR.className = 'modo-btn p-4 rounded-xl border-2 border-gray-300 bg-white text-gray-700 font-bold transition';
+    btnD.className = 'modo-btn p-4 rounded-xl border-2 border-orange-500 bg-orange-50 text-orange-700 font-bold transition';
+    document.getElementById('modoInfo').textContent = 'Modo actual: Entrega a Domicilio · Precios +10% (recargo delivery)';
+    document.getElementById('ck-dir-wrap').classList.remove('hidden');
+    document.getElementById('ck-suc-wrap').classList.add('hidden');
+  }
+  // Recalcular precios del carrito y re-render productos
+  renderProductos();
+  if (carrito.length) renderCarrito();
+}
+
+// Modal agregar al carrito
+function abrirModalAgregar(pid) {
+  productoSeleccionado = productos.find(function(p) { return p.id === pid; });
+  if (!productoSeleccionado) return;
+  document.getElementById('modalProdNombre').textContent = productoSeleccionado.nombre;
+  document.getElementById('modalProdPrecio').innerHTML = 'Bs.' + precioActual(productoSeleccionado) + '/maple · Bs.' + precioUnidadActual(productoSeleccionado).toFixed(2) + '/unidad';
+  // Render multi-unidad Maple + Unidades
+  document.getElementById('modalMultiUnidad').innerHTML = renderMultiUnidad('agregar', 1);
+  document.getElementById('modalAgregar').style.display = 'flex';
+  actualizarDisplayAgregar();
+}
+
+function cerrarModalAgregar() {
+  document.getElementById('modalAgregar').style.display = 'none';
+}
+
+function renderMultiUnidad(prefix, maplesDefault) {
+  return '<div class="grid grid-cols-2 gap-3 bg-gray-50 rounded-lg p-3">' +
+    '<div class="bg-white rounded p-3 text-center border-2 border-orange-300">' +
+      '<p class="text-sm text-orange-700 font-bold mb-1">📦 Maple</p>' +
+      '<p class="text-xs text-gray-500 mb-2">= 30 unidades</p>' +
+      '<div class="flex items-center justify-center gap-2">' +
+        '<button type="button" onclick="cambiarCant(\'agregar-maples\',-1)" class="w-12 h-12 bg-orange-200 hover:bg-orange-300 rounded text-xl font-bold">−</button>' +
+        '<input type="number" id="agregar-maples" value="' + maplesDefault + '" min="0" onchange="actualizarDisplayAgregar()" class="w-16 h-12 text-center border-2 border-orange-300 rounded text-base font-bold">' +
+        '<button type="button" onclick="cambiarCant(\'agregar-maples\',1)" class="w-12 h-12 bg-orange-200 hover:bg-orange-300 rounded text-xl font-bold">+</button>' +
+      '</div>' +
+    '</div>' +
+    '<div class="bg-white rounded p-3 text-center border-2 border-blue-300">' +
+      '<p class="text-sm text-blue-700 font-bold mb-1">🥚 Unidades</p>' +
+      '<p class="text-xs text-gray-500 mb-2">= 1 unidad</p>' +
+      '<div class="flex items-center justify-center gap-2">' +
+        '<button type="button" onclick="cambiarCant(\'agregar-unidades\',-1)" class="w-12 h-12 bg-blue-200 hover:bg-blue-300 rounded text-xl font-bold">−</button>' +
+        '<input type="number" id="agregar-unidades" value="0" min="0" onchange="actualizarDisplayAgregar()" class="w-16 h-12 text-center border-2 border-blue-300 rounded text-base font-bold">' +
+        '<button type="button" onclick="cambiarCant(\'agregar-unidades\',1)" class="w-12 h-12 bg-blue-200 hover:bg-blue-300 rounded text-xl font-bold">+</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>' +
+  '<div id="agregar-total" class="mt-2 bg-blue-50 border border-blue-200 rounded p-2 text-center text-sm"></div>';
+}
+
+function cambiarCant(id, delta) {
+  var inp = document.getElementById(id);
+  var actual = parseInt(inp.value) || 0;
+  inp.value = Math.max(0, actual + delta);
+  actualizarDisplayAgregar();
+}
+
+function actualizarDisplayAgregar() {
+  if (!productoSeleccionado) return;
+  var maples = parseInt(document.getElementById('agregar-maples').value) || 0;
+  var unidades = parseInt(document.getElementById('agregar-unidades').value) || 0;
+  var totalU = maples * 30 + unidades;
+  var precio = precioActual(productoSeleccionado);
+  var precioU = precioUnidadActual(productoSeleccionado);
+  var subtotal = maples * precio + unidades * precioU;
+  var el = document.getElementById('agregar-total');
+  el.innerHTML = '<p class="font-bold text-blue-700">📊 Total: ' + totalU + ' unidades · Bs.' + subtotal.toFixed(2) + '</p>' +
+    '<p class="text-xs text-gray-600 mt-1">' + (maples > 0 ? maples + ' maple' + (maples > 1 ? 's' : '') : '') + (maples > 0 && unidades > 0 ? ' + ' : '') + (unidades > 0 ? unidades + ' unidad' + (unidades > 1 ? 'es' : '') : '') + '</p>';
+}
+
+function confirmarAgregar() {
+  if (!productoSeleccionado) return;
+  var maples = parseInt(document.getElementById('agregar-maples').value) || 0;
+  var unidades = parseInt(document.getElementById('agregar-unidades').value) || 0;
+  if (maples === 0 && unidades === 0) {
+    showToast('⚠️ Cantidad 0', 'Elegí al menos 1 unidad'); return;
+  }
+  var precio = precioActual(productoSeleccionado);
+  var precioU = precioUnidadActual(productoSeleccionado);
+  var subtotal = maples * precio + unidades * precioU;
+  // Verificar si ya está en carrito
+  var existe = carrito.find(function(c) { return c.id === productoSeleccionado.id; });
+  if (existe) {
+    existe.maples += maples;
+    existe.unidades += unidades;
+    existe.subtotal = existe.maples * precioActual(existe) + existe.unidades * precioUnidadActual(existe);
+  } else {
+    carrito.push({
+      id: productoSeleccionado.id,
+      nombre: productoSeleccionado.nombre,
+      icon: productoSeleccionado.icon,
+      maples: maples,
+      unidades: unidades,
+      precioMapleModo: precio,
+      precioUnidadModo: precioU
+    });
+  }
+  // Recalcular subtotal de cada item con el modo actual
+  carrito.forEach(function(c) {
+    var p = productos.find(function(x) { return x.id === c.id; });
+    if (p) {
+      c.precioMapleModo = precioActual(p);
+      c.precioUnidadModo = precioUnidadActual(p);
+      c.subtotal = c.maples * c.precioMapleModo + c.unidades * c.precioUnidadModo;
+    }
+  });
+  cerrarModalAgregar();
+  actualizarCarritoCount();
+  showToast('✅ Agregado', productoSeleccionado.nombre + ' · ' + (maples > 0 ? maples + ' maple(s)' : '') + (unidades > 0 ? ' + ' + unidades + 'u' : ''));
+}
+
+function actualizarCarritoCount() {
+  var count = carrito.length;
+  var el = document.getElementById('carritoCount');
+  el.textContent = count;
+  el.style.display = count > 0 ? 'flex' : 'none';
+}
+
+function abrirCarrito() {
+  renderCarrito();
+  document.getElementById('modalCarrito').style.display = 'flex';
+}
+
+function cerrarCarrito() {
+  document.getElementById('modalCarrito').style.display = 'none';
+}
+
+function renderCarrito() {
+  var div = document.getElementById('carritoItems');
+  var vacio = document.getElementById('carritoVacio');
+  var resumen = document.getElementById('carritoResumen');
+  var checkout = document.getElementById('checkoutForm');
+  if (!carrito.length) {
+    div.innerHTML = '';
+    vacio.style.display = 'block';
+    resumen.classList.add('hidden');
+    checkout.classList.add('hidden');
+    return;
+  }
+  vacio.style.display = 'none';
+  resumen.classList.remove('hidden');
+  checkout.classList.remove('hidden');
+  div.innerHTML = carrito.map(function(c, idx) {
+    return '<div class="flex items-center justify-between border-b py-2">' +
+      '<div class="flex-1">' +
+        '<p class="font-bold text-sm">' + (c.icon || '🥚') + ' ' + c.nombre + '</p>' +
+        '<p class="text-xs text-gray-600">' + (c.maples > 0 ? c.maples + ' maple(s)' : '') + (c.maples > 0 && c.unidades > 0 ? ' + ' : '') + (c.unidades > 0 ? c.unidades + 'u' : '') + '</p>' +
+        '<p class="text-[10px] text-gray-500">Bs.' + c.precioMapleModo + '/maple · Bs.' + c.precioUnidadModo.toFixed(2) + '/u</p>' +
+      '</div>' +
+      '<div class="text-right">' +
+        '<p class="font-bold text-orange-600">Bs.' + c.subtotal.toFixed(2) + '</p>' +
+        '<button onclick="quitarItem(' + idx + ')" class="text-xs text-red-500 hover:underline">🗑️ Quitar</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  // Calcular totales
+  var subtotal = carrito.reduce(function(s, c) { return s + c.subtotal; }, 0);
+  var recargo = 0;
+  if (modoActual === 'DOMICILIO') {
+    // Recargo = diferencia entre precio domicilio y recoger
+    recargo = carrito.reduce(function(s, c) {
+      var p = productos.find(function(x) { return x.id === c.id; });
+      if (!p) return s;
+      var dif = (p.precioDomicilio - p.precioRecoger);
+      var maplesDif = dif * c.maples;
+      var unidadesDif = (dif / (p.unidadesPorMaple || 30)) * c.unidades;
+      return s + maplesDif + unidadesDif;
+    }, 0);
+  }
+  var total = subtotal;
+  document.getElementById('resSubtotal').textContent = 'Bs.' + subtotal.toFixed(2);
+  if (modoActual === 'DOMICILIO') {
+    document.getElementById('recargoRow').style.display = 'flex';
+    document.getElementById('resRecargo').textContent = '+Bs.' + recargo.toFixed(2);
+  } else {
+    document.getElementById('recargoRow').style.display = 'none';
+  }
+  document.getElementById('resTotal').textContent = 'Bs.' + total.toFixed(2);
+}
+
+function quitarItem(idx) {
+  carrito.splice(idx, 1);
+  actualizarCarritoCount();
+  renderCarrito();
+}
+
+async function confirmarPedido() {
+  var nombre = document.getElementById('ck-nombre').value.trim();
+  var tel = document.getElementById('ck-tel').value.trim();
+  if (!nombre || !tel) {
+    showToast('⚠️ Faltan datos', 'Nombre y teléfono obligatorios'); return;
+  }
+  if (modoActual === 'DOMICILIO') {
+    var dir = document.getElementById('ck-dir').value.trim();
+    if (!dir) { showToast('⚠️ Falta dirección', 'Dirección obligatoria para entrega a domicilio'); return; }
+  }
+  var hora = document.getElementById('ck-hora').value;
+  var suc = document.getElementById('ck-suc').value;
+  var obs = document.getElementById('ck-obs').value;
+  var subtotal = carrito.reduce(function(s, c) { return s + c.subtotal; }, 0);
+  var recargo = 0;
+  if (modoActual === 'DOMICILIO') {
+    recargo = carrito.reduce(function(s, c) {
+      var p = productos.find(function(x) { return x.id === c.id; });
+      if (!p) return s;
+      var dif = (p.precioDomicilio - p.precioRecoger);
+      return s + dif * c.maples + (dif / (p.unidadesPorMaple || 30)) * c.unidades;
+    }, 0);
+  }
+  var total = subtotal;
+  var productosDesc = carrito.map(function(c) {
+    return c.nombre + ' (' + (c.maples > 0 ? c.maples + ' map' : '') + (c.maples > 0 && c.unidades > 0 ? ' + ' : '') + (c.unidades > 0 ? c.unidades + 'u' : '') + ')';
+  }).join(' + ');
+  
+  var payload = {
+    cliente: nombre,
+    tel: tel,
+    direccion: modoActual === 'DOMICILIO' ? document.getElementById('ck-dir').value : null,
+    sucursalRecoger: modoActual === 'RECOJO' ? suc : null,
+    modo: modoActual,
+    horaPreferida: hora,
+    observacion: obs,
+    productos: productosDesc,
+    items: carrito.map(function(c) {
+      return {
+        productoId: c.id,
+        nombre: c.nombre,
+        maples: c.maples,
+        unidades: c.unidades,
+        totalUnidades: c.maples * 30 + c.unidades,
+        subtotal: c.subtotal,
+        precioMaple: c.precioMapleModo,
+        precioUnidad: c.precioUnidadModo
+      };
+    }),
+    subtotal: subtotal,
+    recargoDelivery: recargo,
+    total: total,
+    metodo: 'EFECTIVO'  // contra entrega
+  };
+  
+  showToast('⏳ Enviando...', 'Procesando tu pedido');
+  
+  try {
+    var r = await fetch(API + '/tienda/pedidos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    var data = await r.json();
+    if (r.ok && data.ok) {
+      cerrarCarrito();
+      carrito = [];
+      actualizarCarritoCount();
+      showToast('✅ Pedido ' + data.numeroWeb + ' recibido!', 'Te contactaremos al ' + tel);
+      mostrarModalExito(data.numeroWeb, tel);
+    } else {
+      showToast('❌ Error', data.error || 'No se pudo enviar el pedido');
+    }
+  } catch(e) {
+    showToast('❌ Error de conexión', 'Intentá nuevamente');
+  }
+}
+
+function showToast(title, msg) {
+  var t = document.getElementById('toast');
+  document.getElementById('toastTitle').textContent = title;
+  document.getElementById('toastMsg').textContent = msg || '';
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 4000);
+}
+
+// Modal de éxito flotante (sin mostrar IP del servidor)
+function mostrarModalExito(numeroWeb, tel) {
+  document.getElementById('exitoNumPedido').textContent = numeroWeb;
+  document.getElementById('exitoTel').textContent = tel;
+  var modal = document.getElementById('modalExito');
+  modal.style.display = 'flex';
+}
+
+function cerrarModalExito() {
+  document.getElementById('modalExito').style.display = 'none';
+}
+
+// Iniciar
+cargarProductos();
+</script>
+</body>
+</html>
